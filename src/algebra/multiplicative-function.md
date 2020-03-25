@@ -8,11 +8,12 @@ In number theory, a multiplicative function is an arithmetic function $f(n)$ of 
 - $f(1) = 1$
 - For every co-prime pair of integer $a$ and $b$: $f(ab)=f(a)f(b)$
 
-Some popular multiplicative functions are:
+### Examples
 
 - $Id_k(n)$: the power functions, defined by $id_k(n) = n^k$ for any number $k$. As special cases we have:
     + $Id_0(n) = I(n)$: the constant function
     + $Id_1(n) = Id(n)$: the [identity function](https://en.wikipedia.org/wiki/Identity_function)
+- $\epsilon(n)$: the unit function, defined by $\epsilon(n) = 1$ if $n = 1$ and $0$ otherwise.
 - $gcd(n,k)$: the greatest common divisor of $n$ and a fixed integer $k$, as a function of $n$
 - $\sigma_k(n)$: the divisor function, which is the sum of the k-th powers of all the positive divisors of $n$. As special cases we have:
     + $\sigma_0(n) = d(n)$: the number of positive divisors of $n$
@@ -22,6 +23,14 @@ Some popular multiplicative functions are:
     + $\mu(n) = 0$ if $n$ is not square-free
     + $\mu(n) = 1$ if $n$ has even numbers of prime factors
     + $\mu(n) = -1$ if $n$ has odd numbers of prime factors
+
+### Transitive property:
+
+Given two multiplicative functions $f(x)$ and $g(x)$, we have:
+
+- Their product $h(x) = f(x) g(x)$ is also multiplicative.
+- Their Dirichlet convolution $$(f * g)(n) = \sum_{d | n}{f(d) * g(n/d)}$$ is also multiplicative (more about Dirichlet convolution below).  
+Specifically, if $f(x)$ is multiplicative, $h(x) = \displaystyle \sum_{d | n}{f(d)}$ is also multiplicative.
 
 ## Calculation using the sieve of Eratosthenes
 
@@ -57,10 +66,10 @@ In most situation, a simple relationship between them exists. For example, with 
 
 **Note**: Don't forget to initialize $f[1] = 1$ (very important).
 
-Here is the implementation for Euler's totient function:
+Here is the to calculate both Euler's totient function and Mobius function:
 ```cpp
 const int N = 10000000;
-int lp[N + 1], phi[N + 1];
+int lp[N + 1], phi[N + 1], mu[N + 1];
 vector<int> pr;
 
 phi[1] = 1;
@@ -69,6 +78,7 @@ for (int i = 2; i <= N; ++i) {
     // first case
     lp[i] = i;
     phi[i] = i - 1;
+    mu[i] = -1;
     pr.push_back(i);
   }
   for (int j = 0; j < (int)pr.size() && pr[j] <= lp[i] && i * pr[j] <= N; ++j) {
@@ -76,9 +86,11 @@ for (int i = 2; i <= N; ++i) {
     if (pr[j] < lp[i]) {
       // second case
       phi[i * pr[j]] = phi[i] * phi[pr[j]];
+      mu[i * pr[j]] = mu[i] * mu[pr[j]];
     } else {
       // third case
       phi[i * pr[j]] = phi[i] * pr[j];
+      mu[i * pr[j]] = 0;
     }
   }
 }
@@ -127,9 +139,11 @@ Let $f(n) = n^k$ and $g(n) = 1$. Obviously $f$ and $g$ are multiplicative functi
 $$(f * g)(n) = \sum_{d | n}{f(d) * g(n/d)} = \sum_{d | n}{d^k} = \sigma_k(n)$$
 Therefore, the divisor function is multiplicative.
 
+You can find more examples on [Wikipedia](https://en.wikipedia.org/wiki/Multiplicative_function#Convolution).
+
 ## Applications
 ### Sum of GCD ### {#gcdsum}
-Given a number $n$, find the sum of GCDs of all distinct pairs that can be formed with integers from $1$ to $n$.
+Given a number $n$, find the sum of GCDs of all unordered pairs that can be formed with integers from $1$ to $n$ (unordered means that $(i, j)$ and $(j, i)$ are considered the same).
 
 We will calculate $h(x) = \displaystyle \sum_{1 \le i \le x}{gcd(x, i)}$.  
 The answer for the problem would be $\displaystyle \sum_{1 \le i \le n}{\left (h(i) - i  \right )}$
@@ -182,6 +196,63 @@ for (int i = 2; i <= N; ++i) {
 }
 ```
 
+### Number of co-prime pairs in a set
+
+Given a set $S$ of numbers. Find the number of co-prime pairs in this set.
+
+We will use inclusion-exclusion principle and Mobius function to solve this problem.
+
+For simplicity, denote a pair $(x, y)$ divisible by $k$ if both $x$ and $y$ are divisible by $k$.
+
+Using inclusion-exclusion principle, the answer is:
+```
++ number of pairs divisible by 1
+- number of pairs divisible by 2
+- number of pairs divisible by 3
+- number of pairs divisible by 5
+...
++ number of pairs divisible by 2 * 3
++ number of pairs divisible by 2 * 5
++ number of pairs divisible by 3 * 5
+...
+- number of pairs divisible by 2 * 3 * 5
+...
+```
+
+Let $cnt_k$ be the number of multiples of $k$ in $S$.
+
+The answer is: $\displaystyle \sum{\dfrac{cnt_i * (cnt_i - 1)}{2} * \mu(i)}$.
+
+Some problems require adding/removing numbers in a set. To add/remove $x$, we only need to update $cnt_k$ for $k$ divides $x$. Complexity of each operation is $O(\sigma_0(x))$.
+
+#### Arbitrary GCD
+
+To count pairs $(x, y)$ with $gcd(x, y) = g$ for any $g$, take all multiple of $g$ in $S$ and divide them by $g$ to create a new set. We move back to the original problem: count co-prime pairs in the new set.
+
+#### Number of relative primes
+
+Instead of counting pairs, we want to know how many numbers in $S$ are relative prime to $x$.
+
+Still using inclusion-exclusion principle and Mobius function, the formula is:
+$$\sum_{d | x}{cnt_d * \mu(d)}$$
+
+#### Optimize with bitmask
+
+When we update $cnt$ for some number $x$, we consider many unnecessary divisors of $x$: non square-free divisors, for which Mobius function is $0$.
+
+For example, with $x = 16 = 2^4$, we have 5 divisors ($1$, $2$, $4$, $8$, $16$), but only two of them count ($1$ and $2$). The rest have Mobius value of $0$.
+
+Let the prime factorization of $x$ be $p_1^{e_1} \cdot p_2^{e_2} \cdots p_k^{e_k}$. We will only consider divisors of type $p_1^{a_1} \cdot p_2^{a_2} \cdots p_k^{a_k}$ where $a_i \in \left \\{ 0; 1 \right \\}$. It's clear that we can use bitmask, each bit corresponds to one prime factor.
+
+But how many bits will we need to consider? The number with most prime factors is $2 * 3 * 7 * \cdots$. Keep multiplying until it's larger than maximum of $x$.
+
+For example, if maximum of $x$ is $5e5$, we only need to consider at most $6$ bits, since $2 * 3 * 5 * 7 * 11 * 13 * 17 = 510510$ is larger than $5e5$.
+
+In addition, we don't need to pre-calculate Mobius function. Count number of bits set, if it's odd, Mobius value is $-1$, otherwise it's $1$.
+
 ## Practice Problems  
 - [Codeforces - Bash Plays with Functions](https://codeforces.com/contest/757/problem/E)
 - [Codeforces - The Holmes Children](https://codeforces.com/contest/776/problem/E)
+- [Codeforces - Mike and Foam](https://codeforces.com/contest/547/problem/C)
+- [Codeforces - Classical?](https://codeforces.com/contest/1285/problem/F)
+- [HackerRank - Pairwise GCD](https://www.hackerrank.com/contests/infinitum13/challenges/pairwise-gcd)
